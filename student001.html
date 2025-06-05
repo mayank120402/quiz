@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Student Panel</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f4f8;
+      padding: 20px;
+      margin: 0;
+      color: #333;
+    }
+    h1, h2 {
+      color: #2c3e50;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+    }
+    .section {
+      background: white;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    input, button, textarea {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    button {
+      background-color: #3498db;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    #messagesBox {
+      max-height: 200px;
+      overflow-y: auto;
+      background: #f9f9f9;
+      border: 1px solid #ccc;
+      padding: 10px;
+    }
+    .question-block {
+      margin-bottom: 20px;
+      padding: 10px;
+      border-bottom: 1px dashed #ccc;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📘 Student Quiz Panel</h1>
+
+    <!-- Registration Section -->
+    <div class="section" id="registerSection">
+      <h2>Create Account</h2>
+      <input type="text" id="regName" placeholder="Create Your Name" />
+      <input type="password" id="regPassword" placeholder="Create Password" />
+      <button onclick="register()">Register</button>
+    </div>
+
+    <!-- Login Section -->
+    <div class="section" id="loginSection">
+      <h2>Login</h2>
+      <input type="text" id="studentNameInput" placeholder="Enter Your Name" />
+      <input type="password" id="studentPasswordInput" placeholder="Enter Your Password" />
+      <button onclick="login()">Login</button>
+    </div>
+
+    <!-- Quiz Section -->
+    <div class="section" id="quizSection" style="display:none;">
+      <h2>Attempt Quiz</h2>
+      <form id="quizForm"></form>
+      <button onclick="submitQuiz()">Submit Quiz</button>
+    </div>
+
+    <!-- Score Section -->
+    <div class="section" id="scoreSection" style="display:none;">
+      <h2>Your Scorecard</h2>
+      <div id="scoreDisplay"></div>
+    </div>
+
+    <!-- Messaging Section -->
+    <div class="section" id="messageSection" style="display:none;">
+      <h2>Messages</h2>
+      <div id="messagesBox"></div>
+      <textarea id="studentMessage" placeholder="Your message..."></textarea>
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+<script>
+let currentStudent = null;
+
+const loadData = (key, def) => JSON.parse(localStorage.getItem(key)) || def;
+const saveData = (key, val) => localStorage.setItem(key, JSON.stringify(val));
+
+let registeredStudents = loadData('registeredStudents', []);
+
+function register() {
+  const name = document.getElementById("regName").value.trim();
+  const password = document.getElementById("regPassword").value.trim();
+  if (!name || !password) return alert("Please enter name and password");
+
+  const exists = registeredStudents.find(s => s.name === name);
+  if (exists) return alert("This name already exists. Try a different name.");
+
+  registeredStudents.push({ name, password });
+  saveData('registeredStudents', registeredStudents);
+  alert("Registration successful! You can now login.");
+  document.getElementById("regName").value = "";
+  document.getElementById("regPassword").value = "";
+}
+
+function login() {
+  const name = document.getElementById('studentNameInput').value.trim();
+  const password = document.getElementById('studentPasswordInput').value.trim();
+
+  if (!name || !password) return alert("Please enter name and password");
+
+  const student = registeredStudents.find(s => s.name === name && s.password === password);
+
+  if (!student) return alert("Invalid name or password!");
+
+  currentStudent = name;
+  document.getElementById("loginSection").style.display = "none";
+  document.getElementById("registerSection").style.display = "none";
+  document.getElementById("quizSection").style.display = "block";
+  document.getElementById("scoreSection").style.display = "block";
+  document.getElementById("messageSection").style.display = "block";
+
+  loadQuiz();
+  renderScore();
+  renderMessages();
+}
+
+function loadQuiz() {
+  const quiz = loadData("quizQuestions", []);
+  const form = document.getElementById("quizForm");
+  form.innerHTML = "";
+
+  quiz.forEach((q, i) => {
+    const block = document.createElement("div");
+    block.className = "question-block";
+    block.innerHTML = `
+      <p><strong>Q${i + 1}: ${q.question}</strong></p>
+      <label><input type="radio" name="q${i}" value="A"> ${q.options.A}</label><br>
+      <label><input type="radio" name="q${i}" value="B"> ${q.options.B}</label><br>
+      <label><input type="radio" name="q${i}" value="C"> ${q.options.C}</label><br>
+      <label><input type="radio" name="q${i}" value="D"> ${q.options.D}</label>
+    `;
+    form.appendChild(block);
+  });
+}
+
+function submitQuiz() {
+  const quiz = loadData("quizQuestions", []);
+  let score = 0;
+  quiz.forEach((q, i) => {
+    const val = document.querySelector(`input[name=q${i}]:checked`);
+    if (val && val.value === q.correctAnswer) score++;
+  });
+  const result = { studentName: currentStudent, score, date: new Date().toISOString() };
+  const results = loadData("studentResults", []);
+  results.push(result);
+  saveData("studentResults", results);
+  alert(`Quiz Submitted! You scored ${score}/${quiz.length}`);
+  renderScore();
+}
+
+function renderScore() {
+  const results = loadData("studentResults", []);
+  const r = results.filter(r => r.studentName === currentStudent).pop();
+  if (!r) return;
+  document.getElementById("scoreDisplay").innerHTML = `
+    <p><strong>Name:</strong> ${r.studentName}</p>
+    <p><strong>Score:</strong> ${r.score}/${loadData("quizQuestions", []).length}</p>
+    <p><strong>Date:</strong> ${new Date(r.date).toLocaleString()}</p>
+  `;
+}
+
+function renderMessages() {
+  const messages = loadData("messages", []);
+  const filtered = messages.filter(m => m.receiver === currentStudent || m.receiver === "All");
+  document.getElementById("messagesBox").innerHTML = filtered.map(m =>
+    `<p><strong>${m.sender}:</strong> ${m.content} <small>(${m.timestamp})</small></p>`
+  ).join('');
+}
+
+function sendMessage() {
+  const msg = document.getElementById("studentMessage").value.trim();
+  if (!msg) return alert("Enter message!");
+  const messages = loadData("messages", []);
+  messages.push({ sender: currentStudent, receiver: "Admin", content: msg, timestamp: new Date().toLocaleString() });
+  saveData("messages", messages);
+  document.getElementById("studentMessage").value = "";
+  renderMessages();
+}
+</script>
+</body>
+</html>
