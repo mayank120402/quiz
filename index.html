@@ -1,0 +1,186 @@
+<!--  admin can change the code -->
+  <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Panel</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: auto;
+    }
+    input, button, textarea, select {
+      margin: 5px 0;
+      padding: 8px;
+      width: 100%;
+      max-width: 500px;
+    }
+    h2 {
+      color: darkred;
+      margin-top: 30px;
+    }
+    .question-block {
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Admin Quiz Control Panel</h1>
+
+  <!-- Admin Login -->
+  <div id="adminLogin">
+    <h2>Login</h2>
+    <input type="text" id="adminUsername" placeholder="Admin Username">
+    <input type="password" id="adminPassword" placeholder="Admin Password">
+    <button onclick="adminLogin()">Login</button>
+  </div>
+
+  <!-- Admin Functional Area -->
+  <div id="adminPanel" style="display:none;">
+
+    <!-- Quiz Editor -->
+    <h2>Quiz Editor</h2>
+    <div id="quizEditor"></div>
+    <button onclick="addQuestion()">Add New Question</button>
+    <button onclick="saveQuiz()">Save Quiz</button>
+
+    <!-- Result Viewer -->
+    <h2>Student Results</h2>
+    <div id="resultsBox"></div>
+
+    <!-- Top 10 Sender -->
+    <h2>Send Top 10 Student List</h2>
+    <button onclick="sendTop10List()">Send to All Students</button>
+    <div id="statusMsg" style="color:green; font-weight:bold;"></div>
+  </div>
+
+<script>
+const ADMIN_CREDENTIALS = { username: "admin", password: "admin123" };
+
+const loadData = (key, def) => JSON.parse(localStorage.getItem(key)) || def;
+const saveData = (key, val) => localStorage.setItem(key, JSON.stringify(val));
+
+function adminLogin() {
+  const u = document.getElementById("adminUsername").value.trim();
+  const p = document.getElementById("adminPassword").value.trim();
+  if (u === ADMIN_CREDENTIALS.username && p === ADMIN_CREDENTIALS.password) {
+    document.getElementById("adminLogin").style.display = "none";
+    document.getElementById("adminPanel").style.display = "block";
+    loadQuizEditor();
+    showStudentResults();
+  } else {
+    alert("Invalid credentials");
+  }
+}
+
+// Quiz Editor
+function loadQuizEditor() {
+  const quiz = loadData("quizQuestions", []);
+  const container = document.getElementById("quizEditor");
+  container.innerHTML = "";
+  quiz.forEach((q, i) => {
+    container.innerHTML += `
+      <div class="question-block">
+        <b>Question ${i + 1}</b><br>
+        <textarea onchange="updateQuestion(${i}, 'question', this.value)">${q.question}</textarea><br>
+        A: <input value="${q.options.A}" onchange="updateOption(${i}, 'A', this.value)"><br>
+        B: <input value="${q.options.B}" onchange="updateOption(${i}, 'B', this.value)"><br>
+        C: <input value="${q.options.C}" onchange="updateOption(${i}, 'C', this.value)"><br>
+        D: <input value="${q.options.D}" onchange="updateOption(${i}, 'D', this.value)"><br>
+        Correct Answer: 
+        <select onchange="updateQuestion(${i}, 'correctAnswer', this.value)">
+          <option value="A" ${q.correctAnswer === "A" ? "selected" : ""}>A</option>
+          <option value="B" ${q.correctAnswer === "B" ? "selected" : ""}>B</option>
+          <option value="C" ${q.correctAnswer === "C" ? "selected" : ""}>C</option>
+          <option value="D" ${q.correctAnswer === "D" ? "selected" : ""}>D</option>
+        </select>
+      </div>`;
+  });
+}
+
+function updateQuestion(index, field, value) {
+  const quiz = loadData("quizQuestions", []);
+  quiz[index][field] = value;
+  saveData("quizQuestions", quiz);
+}
+
+function updateOption(index, opt, value) {
+  const quiz = loadData("quizQuestions", []);
+  quiz[index].options[opt] = value;
+  saveData("quizQuestions", quiz);
+}
+
+function addQuestion() {
+  const quiz = loadData("quizQuestions", []);
+  quiz.push({
+    question: "New question?",
+    options: { A: "", B: "", C: "", D: "" },
+    correctAnswer: "A"
+  });
+  saveData("quizQuestions", quiz);
+  loadQuizEditor();
+}
+
+function saveQuiz() {
+  alert("Quiz saved successfully!");
+}
+
+// Results
+function showStudentResults() {
+  const results = loadData("studentResults", []);
+  const box = document.getElementById("resultsBox");
+  if (!results.length) {
+    box.innerHTML = "No results available.";
+    return;
+  }
+  box.innerHTML = results.map(r =>
+    `<div><b>${r.studentName}</b> - ${r.score} / ${loadData("quizQuestions", []).length} 
+     <small>(${new Date(r.date).toLocaleString()})</small></div>`
+  ).join("");
+}
+
+// Send Top 10
+function sendTop10List() {
+  const results = loadData("studentResults", []);
+  const grouped = {};
+
+  // Group by latest score per student
+  results.forEach(r => {
+    if (!grouped[r.studentName] || new Date(r.date) > new Date(grouped[r.studentName].date)) {
+      grouped[r.studentName] = r;
+    }
+  });
+
+  const top10 = Object.values(grouped)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
+
+  if (top10.length === 0) {
+    alert("No student results found.");
+    return;
+  }
+
+  let message = "📢 Top 10 Students:\n";
+  top10.forEach((s, i) => {
+    message += `${i + 1}. ${s.studentName} - ${s.score}/${loadData("quizQuestions", []).length}\n`;
+  });
+
+  const messages = loadData("messages", []);
+  messages.push({
+    sender: "Admin",
+    receiver: "All",
+    content: message.trim(),
+    timestamp: new Date().toLocaleString()
+  });
+
+  saveData("messages", messages);
+  document.getElementById("statusMsg").innerText = "Top 10 list sent to all students!";
+}
+</script>
+</body>
+</html>
